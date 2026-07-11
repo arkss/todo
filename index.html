@@ -115,15 +115,6 @@ if (isFirebaseConfigured) {
   } catch (e) { console.error('Firebase init 실패:', e); }
 }
 
-const SEED_TODOS = [
-  { title: '약 먹기', owner: 'mina', done: false, streak: 4, needHelp: false, reactions: ['💖'], estMin: 5, actualSec: 0, timerStart: null },
-  { title: '빨래 돌리기', owner: 'mina', done: false, streak: 0, needHelp: true, reactions: [], estMin: 40, actualSec: 0, timerStart: null },
-  { title: '이력서 한 줄만 쓰기', owner: 'mina', done: false, streak: 0, needHelp: false, reactions: [], estMin: 10, actualSec: 0, timerStart: null },
-  { title: '장보기', owner: 'minseong', done: true, streak: 0, needHelp: false, reactions: ['💖'], completedAt: Date.now(), estMin: 30, actualSec: 1440, timerStart: null },
-  { title: '데이트 장소 정하기', owner: 'both', done: false, streak: 0, needHelp: false, reactions: [], estMin: 15, actualSec: 0, timerStart: null },
-  { title: '물 마시기', owner: 'mina', done: true, streak: 7, needHelp: false, reactions: ['💖'], completedAt: Date.now(), estMin: 2, actualSec: 180, timerStart: null },
-];
-
 /* ---------- 시간 포맷 / 비교 헬퍼 ---------- */
 const fmtMin = (sec) => sec < 60 ? Math.max(0, Math.round(sec)) + '초' : Math.round(sec / 60) + '분';
 const fmtClock = (sec) => { sec = Math.floor(Math.max(0, sec)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); };
@@ -144,8 +135,7 @@ function makeLocalStore(coupleId) {
     try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; }
   };
   const write = (arr) => localStorage.setItem(KEY, JSON.stringify(arr));
-  let cache = read();
-  if (!cache) { cache = SEED_TODOS.map((t, i) => ({ id: 'seed' + i, order: i, ...t })); write(cache); }
+  let cache = read() || [];
   const subs = new Set();
   const emit = () => subs.forEach(fn => fn(cache.slice().sort((a, b) => a.order - b.order)));
   return {
@@ -162,14 +152,6 @@ function makeFirestore(coupleId) {
   const col = db.collection('couples').doc(coupleId).collection('todos');
   return {
     mode: 'cloud',
-    async ensureSeed() {
-      const snap = await col.limit(1).get();
-      if (snap.empty) {
-        const batch = db.batch();
-        SEED_TODOS.forEach((t, i) => batch.set(col.doc(), { ...t, order: i, createdAt: Date.now() }));
-        await batch.commit();
-      }
-    },
     subscribe(fn) {
       return col.orderBy('order', 'asc').onSnapshot(
         (snap) => fn(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
@@ -600,7 +582,6 @@ function App() {
       if (isFirebaseConfigured && db) {
         try { await auth.signInAnonymously(); } catch (e) { console.error('익명 로그인 실패:', e); }
         store = makeFirestore(coupleId);
-        try { await store.ensureSeed(); } catch (e) { console.error('초기 데이터 생성 실패:', e); }
       } else {
         store = makeLocalStore(coupleId);
       }
@@ -657,6 +638,11 @@ function App() {
     localStorage.setItem('couple52_48:id', code);
     setCoupleId(code);
   };
+  const changeCouple = () => {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('코드 입력 화면으로 나갈까요?')) return;
+    localStorage.removeItem('couple52_48:id');
+    setCoupleId(''); setTodos([]); setReady(false); setTab('home');
+  };
 
   // 날짜 / 미완료 자동 이월
   const now = new Date();
@@ -700,6 +686,10 @@ function App() {
             </button>
           );
         })}
+        <button onClick={changeCouple} title="코드 변경" style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0' }}>
+          <span style={{ fontSize: 22, filter: 'grayscale(.4) opacity(.55)' }}>⚙️</span>
+          <span style={{ fontFamily: "'Jua'", fontSize: 11, color: '#B7AEC4' }}>코드 변경</span>
+        </button>
       </div>
     </div>
   );
