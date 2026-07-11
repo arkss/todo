@@ -37,7 +37,7 @@
   }
   @media (max-width: 440px) {
     body { background: #FFF6EF; }
-    .phone { border-radius: 0; height: 100vh; box-shadow: none; }
+    .phone { border-radius: 0; height: 100vh; height: 100dvh; box-shadow: none; }
   }
 </style>
 </head>
@@ -674,14 +674,14 @@ function App() {
     <div className="phone">
       <Celebration data={celebrate} />
 
-      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px 20px' }}>
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', paddingTop: 'calc(16px + env(safe-area-inset-top))', paddingLeft: 18, paddingRight: 18, paddingBottom: 20 }}>
         {!ready && <div style={{ textAlign: 'center', color: '#B7AEC4', marginTop: 40 }}>불러오는 중… 💗</div>}
         {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />}
         {ready && tab === 'stats' && <StatsScreen todos={visibleTodos} nowMs={nowMs} fullDateLabel={fullDateLabel} />}
       </div>
 
       {/* 하단 네비 */}
-      <div style={{ flex: '0 0 auto', background: '#fff', borderTop: '1px solid #F1EAF3', display: 'flex', padding: '8px 8px 22px' }}>
+      <div style={{ flex: '0 0 auto', background: '#fff', borderTop: '1px solid #F1EAF3', display: 'flex', paddingTop: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
         {tabs.map(d => {
           const active = tab === d.key;
           return (
