@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>52:48 · 커플 TODO</title>
+<meta name="theme-color" content="#FFF6EF" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: 'Gowun Dodum', sans-serif;
+    background: linear-gradient(160deg, #FCEFF6, #EFF6EE);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100%;
+  }
+  #root { width: 100%; display: flex; justify-content: center; }
+  button { font-family: inherit; }
+  input { font-family: inherit; }
+  ::-webkit-scrollbar { width: 0; background: transparent; }
+
+  @keyframes conf-fall { 0%{ transform: translateY(-30px) rotate(0); opacity:1 } 100%{ transform: translateY(760px) rotate(540deg); opacity:0 } }
+  @keyframes pop-in { 0%{ transform: scale(.5); opacity:0 } 60%{ transform: scale(1.08) } 100%{ transform: scale(1); opacity:1 } }
+  @keyframes float-y { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-5px) } }
+  @keyframes wiggle { 0%,100%{ transform: rotate(-6deg) } 50%{ transform: rotate(6deg) } }
+  @keyframes check-pop { 0%{ transform: scale(.4) } 70%{ transform: scale(1.25) } 100%{ transform: scale(1) } }
+
+  /* 데스크톱: 중앙 정렬 좁은 컬럼. 모바일: 꽉 채움 */
+  .phone {
+    width: 384px; max-width: 100%; height: 812px; max-height: 100vh;
+    background: #FFF6EF; border-radius: 44px; overflow: hidden;
+    position: relative; display: flex; flex-direction: column;
+    box-shadow: 0 22px 60px rgba(120,90,140,.28), inset 0 0 0 8px #fff;
+  }
+  @media (max-width: 440px) {
+    body { background: #FFF6EF; }
+    .phone { border-radius: 0; height: 100vh; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Firebase (compat) — config를 채우면 실시간 동기화가 켜집니다 -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script type="text/jsx-app" id="app-src">
+/* ============================================================
+ *  ⚙️  1) 여기만 채우면 됩니다 — Firebase 콘솔 > 프로젝트 설정 > 내 앱
+ *      값을 비워두면(placeholder 그대로면) 자동으로
+ *      localStorage 로컬 모드로 동작합니다. (동기화 X, 이 기기에서만)
+ * ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ---------- 아바타 (오리지널 SVG, data URI) ---------- */
+const uri = (s) => 'data:image/svg+xml,' + encodeURIComponent(s);
+const SVG_MINA = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 6C44 6 54 15 55 27 56 36 60 41 57 47 54 53 46 51 41 54 36 57 27 58 21 54 15 51 8 52 8 44 8 37 9 34 9 26 11 14 20 6 32 6Z" fill="#E38BD0"/><ellipse cx="24" cy="33" rx="2.6" ry="3.6" fill="#4E2743"/><ellipse cx="40" cy="33" rx="2.6" ry="3.6" fill="#4E2743"/><path d="M27 41q5 3.5 10 0" stroke="#4E2743" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>';
+const SVG_MINSEONG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="15" cy="52" r="6" fill="#6DB87C"/><circle cx="49" cy="52" r="6" fill="#6DB87C"/><ellipse cx="32" cy="43" rx="23" ry="16" fill="#7BC98A"/><ellipse cx="32" cy="41" rx="17" ry="11" fill="#93DCA4"/><circle cx="24" cy="41" r="2.5" fill="#2E5B3A"/><circle cx="40" cy="41" r="2.5" fill="#2E5B3A"/><path d="M28 47q4 3 8 0" stroke="#2E5B3A" stroke-width="2" fill="none" stroke-linecap="round"/><g fill="#F58FB0"><circle cx="32" cy="12" r="5.5"/><circle cx="23" cy="18" r="5.5"/><circle cx="41" cy="18" r="5.5"/><circle cx="26" cy="27" r="5"/><circle cx="38" cy="27" r="5"/></g><circle cx="32" cy="20" r="5" fill="#FBD46A"/></svg>';
+const SVG_BOTH = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 54C10 38 9 22 21 16 28 12.5 32 18 32 22 32 18 36 12.5 43 16 55 22 54 38 32 54Z" fill="#E38BD0"/></svg>';
+const AV = { mina: uri(SVG_MINA), minseong: uri(SVG_MINSEONG), both: uri(SVG_BOTH) };
+
+const META = {
+  mina:     { who: '미나', avatar: AV.mina,     bg: '#FCE4F3', ink: '#C85BAE', ring: '#E38BD0', border: '#F6DCEF' },
+  minseong: { who: '민성', avatar: AV.minseong, bg: '#E3F5E4', ink: '#3E9E63', ring: '#8FD9A0', border: '#DDF2DE' },
+  both:     { who: '우리', avatar: AV.both,     bg: '#EEE8FF', ink: '#8A6FD1', ring: '#C9BCF0', border: '#EDE7FF' },
+};
+const meta = (o) => META[o] || META.both;
+
+const CELEBRATE_MSGS = ['완전 최고야! 🎉', '해냈다!! 👏', '작은 일도 큰 승리 ✨', '오늘의 히어로 🦸'];
+const CELEBRATE_SUBS = ['정말 대단해 💛', '이 순간을 기억해줘', '한 걸음 나아갔어', '너무 자랑스러워'];
+const CONF_EMOJI = ['🎉','⭐','💖','✨','🌟','💫','🎊','🩷'];
+
+/* ============================================================
+ *  데이터 계층 — Firestore가 설정돼 있으면 실시간 동기화,
+ *  아니면 localStorage 폴백. 동일한 인터페이스를 제공.
+ * ============================================================ */
+const isFirebaseConfigured = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('YOUR_');
+
+let db = null, auth = null;
+if (isFirebaseConfigured) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    auth = firebase.auth();
+  } catch (e) { console.error('Firebase init 실패:', e); }
+}
+
+const SEED_TODOS = [
+  { title: '약 먹기', owner: 'mina', done: false, streak: 4, needHelp: false, reactions: ['💖'], estMin: 5, actualSec: 0, timerStart: null },
+  { title: '빨래 돌리기', owner: 'mina', done: false, streak: 0, needHelp: true, reactions: [], estMin: 40, actualSec: 0, timerStart: null },
+  { title: '이력서 한 줄만 쓰기', owner: 'mina', done: false, streak: 0, needHelp: false, reactions: [], estMin: 10, actualSec: 0, timerStart: null },
+  { title: '장보기', owner: 'minseong', done: true, streak: 0, needHelp: false, reactions: ['💖'], completedAt: Date.now(), estMin: 30, actualSec: 1440, timerStart: null },
+  { title: '데이트 장소 정하기', owner: 'both', done: false, streak: 0, needHelp: false, reactions: [], estMin: 15, actualSec: 0, timerStart: null },
+  { title: '물 마시기', owner: 'mina', done: true, streak: 7, needHelp: false, reactions: ['💖'], completedAt: Date.now(), estMin: 2, actualSec: 180, timerStart: null },
+];
+
+/* ---------- 시간 포맷 / 비교 헬퍼 ---------- */
+const fmtMin = (sec) => sec < 60 ? Math.max(0, Math.round(sec)) + '초' : Math.round(sec / 60) + '분';
+const fmtClock = (sec) => { sec = Math.floor(Math.max(0, sec)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); };
+// 실제 누적 초(진행 중이면 라이브 반영)
+const liveSec = (t, nowMs) => (t.actualSec || 0) + (t.timerStart ? Math.max(0, (nowMs - t.timerStart) / 1000) : 0);
+// 예상 대비 비교 문구
+const diffLabel = (estSec, actSec) => {
+  const d = actSec - estSec;
+  if (Math.abs(d) < 30) return { text: '딱 맞았어 ✨', color: '#5AB98A' };
+  if (d < 0) return { text: fmtMin(-d) + ' 빨리 🎉', color: '#5AB98A' };
+  return { text: fmtMin(d) + ' 더 걸림', color: '#E0912B' };
+};
+
+/* ---------- localStorage 어댑터 ---------- */
+function makeLocalStore(coupleId) {
+  const KEY = 'couple52_48:' + coupleId;
+  const read = () => {
+    try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; }
+  };
+  const write = (arr) => localStorage.setItem(KEY, JSON.stringify(arr));
+  let cache = read();
+  if (!cache) { cache = SEED_TODOS.map((t, i) => ({ id: 'seed' + i, order: i, ...t })); write(cache); }
+  const subs = new Set();
+  const emit = () => subs.forEach(fn => fn(cache.slice().sort((a, b) => a.order - b.order)));
+  return {
+    mode: 'local',
+    subscribe(fn) { subs.add(fn); emit(); return () => subs.delete(fn); },
+    add(todo) { cache = [{ id: 'l' + Date.now(), order: Date.now(), ...todo }, ...cache]; write(cache); emit(); },
+    update(id, patch) { cache = cache.map(t => t.id === id ? { ...t, ...patch } : t); write(cache); emit(); },
+    remove(id) { cache = cache.filter(t => t.id !== id); write(cache); emit(); },
+  };
+}
+
+/* ---------- Firestore 어댑터 ---------- */
+function makeFirestore(coupleId) {
+  const col = db.collection('couples').doc(coupleId).collection('todos');
+  return {
+    mode: 'cloud',
+    async ensureSeed() {
+      const snap = await col.limit(1).get();
+      if (snap.empty) {
+        const batch = db.batch();
+        SEED_TODOS.forEach((t, i) => batch.set(col.doc(), { ...t, order: i, createdAt: Date.now() }));
+        await batch.commit();
+      }
+    },
+    subscribe(fn) {
+      return col.orderBy('order', 'asc').onSnapshot(
+        (snap) => fn(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (err) => console.error('onSnapshot 에러:', err)
+      );
+    },
+    add(todo) { return col.add({ ...todo, order: Date.now(), createdAt: Date.now() }); },
+    update(id, patch) { return col.doc(id).update(patch); },
+    remove(id) { return col.doc(id).delete(); },
+  };
+}
+
+/* ============================================================
+ *  작은 UI 조각들
+ * ============================================================ */
+function CheckBox({ done, owner, size = 30, onClick }) {
+  const mt = meta(owner);
+  const style = {
+    width: size, height: size, flex: '0 0 auto', borderRadius: 10, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '.2s',
+    background: done ? mt.ring : '#fff',
+    border: done ? `2px solid ${mt.ring}` : `2.5px solid ${mt.ring}`,
+  };
+  return (
+    <div onClick={onClick} style={style}>
+      {done && <span style={{ color: '#fff', fontSize: size * 0.57, animation: 'check-pop .35s ease' }}>✓</span>}
+    </div>
+  );
+}
+
+function titleStyle(done) {
+  return {
+    fontFamily: "'Gowun Dodum'", fontSize: 15, minWidth: 0, wordBreak: 'break-word',
+    color: done ? '#C3BBCF' : '#514B5E', textDecoration: done ? 'line-through' : 'none',
+  };
+}
+
+/* ---------- 홈: 사람별 카드 안의 한 항목 ---------- */
+function TodoCard({ t, nowMs, onToggle, onLike, onHelp, onStartTimer, onStopTimer, onEdit, onDelete }) {
+  const canHelp = t.owner === 'mina' && !t.done && !t.needHelp;
+  const mt = meta(t.owner);
+  const running = !!t.timerStart;
+  const cur = liveSec(t, nowMs || Date.now());
+  const hasActual = cur > 0;
+  const diff = (t.estMin && hasActual && !running) ? diffLabel(t.estMin * 60, cur) : null;
+
+  const [editing, setEditing] = useState(false);
+  const [eTitle, setETitle] = useState('');
+  const [eEst, setEEst] = useState('');
+  const startEdit = () => { setETitle(t.title); setEEst(t.estMin || ''); setEditing(true); };
+  const saveEdit = () => {
+    const est = parseInt(eEst, 10);
+    onEdit(t, { title: (eTitle || '').trim() || t.title, estMin: est > 0 ? est : null });
+    setEditing(false);
+  };
+  const delEdit = () => {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('이 할 일을 삭제할까요?')) return;
+    onDelete(t);
+  };
+
+  if (editing) {
+    return (
+      <div style={{ background: '#fff', borderRadius: 18, padding: '12px 13px', margin: 6, boxShadow: '0 4px 12px rgba(150,120,170,.08)', border: `2px solid ${mt.ring}` }}>
+        <input
+          autoFocus value={eTitle}
+          onChange={(e) => setETitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false); }}
+          style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: '#514B5E', background: 'transparent' }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
+          <span style={{ fontSize: 12, color: '#8a7f98' }}>⏱ 예상</span>
+          <input
+            type="number" min="1" inputMode="numeric" value={eEst}
+            onChange={(e) => setEEst(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
+            placeholder="–"
+            style={{ width: 46, border: '1.5px solid #F0E7DF', borderRadius: 10, padding: '4px 6px', fontSize: 13, color: '#514B5E', outline: 'none', textAlign: 'center' }}
+          />
+          <span style={{ fontSize: 12, color: '#8a7f98' }}>분</span>
+          <button onClick={delEdit} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#D66', fontSize: 12, cursor: 'pointer', padding: '5px 6px' }}>🗑 삭제</button>
+          <button onClick={() => setEditing(false)} style={{ background: 'none', border: 'none', color: '#B7AEC4', fontSize: 12, cursor: 'pointer', padding: '5px 6px' }}>취소</button>
+          <button onClick={saveEdit} style={{ background: mt.ring, border: 'none', color: '#fff', fontSize: 13, padding: '7px 14px', borderRadius: 14, cursor: 'pointer' }}>저장</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 18, padding: '12px 13px', margin: 6,
+      boxShadow: '0 4px 12px rgba(150,120,170,.08)',
+      border: running ? `2px solid ${mt.ring}` : (t.needHelp ? '2px solid #FFD6E2' : '2px solid transparent') }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+        <CheckBox done={t.done} owner={t.owner} onClick={() => onToggle(t)} />
+        <span style={{ ...titleStyle(t.done), flex: 1 }}>{t.title}</span>
+        {t.streak > 0 && <span style={{ fontSize: 12, color: '#E0912B' }}>🔥{t.streak}</span>}
+        <button onClick={startEdit} title="수정" style={{ background: 'none', border: 'none', color: '#C9C1D4', fontSize: 13, cursor: 'pointer', padding: '2px 4px', flex: '0 0 auto' }}>✏️</button>
+      </div>
+
+      {/* 시간: 예상 · 실제 · 비교 + 타이머 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+        {t.estMin ? <span style={{ background: '#EEF0F6', color: '#6E7A9B', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>⏱ 예상 {t.estMin}분</span> : null}
+        {hasActual ? <span style={{ background: running ? '#FFE7EE' : '#F1ECF4', color: running ? '#E85D8A' : '#7d738c', fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 20 }}>{running ? '▶ ' : '실제 '}{fmtClock(cur)}</span> : null}
+        {diff ? <span style={{ color: diff.color, fontSize: 11, fontWeight: 'bold' }}>{diff.text}</span> : null}
+        {!t.done && (
+          running
+            ? <button onClick={() => onStopTimer(t)} style={{ marginLeft: 'auto', background: '#FFE1E7', border: 'none', color: '#E85D8A', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>⏹ 끝</button>
+            : <button onClick={() => onStartTimer(t)} style={{ marginLeft: 'auto', background: '#E9F6EE', border: 'none', color: '#3E9E63', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>{hasActual ? '▶ 이어서' : '▶ 시작'}</button>
+        )}
+      </div>
+
+      {/* 응원 / 도움요청 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
+        {t.needHelp && <span style={{ background: '#FFE1E7', color: '#E85D8A', fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 20 }}>🆘 도와줘!</span>}
+        {(t.reactions || []).map((r, i) => <span key={i} style={{ fontSize: 14 }}>{r}</span>)}
+        <button onClick={() => onLike(t)} style={{ marginLeft: 'auto', background: '#FFF0F4', border: 'none', color: '#E85D8A', fontSize: 11, padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>💖</button>
+        {canHelp && <button onClick={() => onHelp(t)} style={{ background: '#EAF4FB', border: 'none', color: '#3D8FC0', fontSize: 11, padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>🙋</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ *  화면들
+ * ============================================================ */
+function HomeScreen({ todos, nowMs, dateLabel, onToggle, onLike, onHelp, onAdd, onStartTimer, onStopTimer, onEdit, onDelete }) {
+  const groupOrder = ['mina', 'minseong', 'both'];
+  // 사람별 그룹은 항상 표시(비어 있어도) → 어느 사람이든 그 자리에서 추가 가능
+  const groups = groupOrder.map(o => ({ owner: o, items: todos.filter(t => t.owner === o) }));
+  const firstMinaUndone = todos.find(t => t.owner === 'mina' && !t.done);
+
+  const [addingOwner, setAddingOwner] = useState(null);
+  const [addText, setAddText] = useState('');
+  const [addEst, setAddEst] = useState('');
+  const submitAdd = (owner) => {
+    const est = parseInt(addEst, 10);
+    onAdd({ title: (addText || '').trim() || '새로운 할 일', owner, estMin: est > 0 ? est : null });
+    setAddText(''); setAddEst(''); setAddingOwner(null);
+  };
+
+  return (
+    <div>
+      {/* 헤더 */}
+      <div style={{ margin: '6px 2px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: "'Jua'", fontSize: 30, color: '#514B5E', lineHeight: 1 }}>
+            52<span style={{ color: '#E38BD0' }}>:</span>48 <span style={{ fontSize: 20 }}>💗</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <img src={AV.minseong} style={{ width: 44, height: 44, animation: 'float-y 3s ease-in-out infinite' }} />
+            <img src={AV.mina} style={{ width: 44, height: 44, marginLeft: -8, animation: 'float-y 3s ease-in-out .6s infinite' }} />
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: '#B7AEC4', marginTop: 4 }}>
+          민성이 <b style={{ color: '#3E9E63' }}>52</b>, 미나가 <b style={{ color: '#C85BAE' }}>48</b>만큼 사랑해 💗 · {dateLabel}
+        </div>
+      </div>
+
+      {/* 넛지 배너 */}
+      {firstMinaUndone && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'linear-gradient(105deg,#FFF0D9,#FFE7EE)', borderRadius: 20, padding: '12px 14px', marginBottom: 16, border: '1.5px dashed #FFC9A3' }}>
+          <span style={{ fontSize: 22 }}>💧</span>
+          <div style={{ fontSize: 13, color: '#8a7a5f', lineHeight: 1.35 }}>
+            <b style={{ color: '#E58a4a' }}>미나야</b>, 물 한 잔 어때? <span style={{ color: '#B79A76' }}>(잔소리 아니고 응원이야 ✨)</span>
+          </div>
+        </div>
+      )}
+
+      {/* 사람별 그룹 */}
+      {groups.map((g) => {
+        const mt = meta(g.owner);
+        const doneN = g.items.filter(t => t.done).length;
+        const adding = addingOwner === g.owner;
+        return (
+          <div key={g.owner} style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 4px 10px' }}>
+              <span style={{ background: mt.bg, width: 46, height: 46, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
+                <img src={mt.avatar} style={{ width: 34, height: 34 }} />
+              </span>
+              <div>
+                <div style={{ fontFamily: "'Jua'", fontSize: 16, color: mt.ink }}>{mt.who}의 할 일</div>
+                <div style={{ fontSize: 12, color: '#A79FB4' }}>
+                  {g.items.length ? `${doneN}/${g.items.length} 완료 · 잘하고 있어!` : '아직 할 일이 없어'}
+                </div>
+              </div>
+            </div>
+            <div style={{ background: mt.bg, borderRadius: 24, padding: 8 }}>
+              {g.items.map(t => (
+                <TodoCard key={t.id} t={t} nowMs={nowMs} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />
+              ))}
+
+              {/* 인라인 추가 */}
+              {adding ? (
+                <div style={{ background: '#fff', borderRadius: 18, padding: '10px 12px', margin: 6, boxShadow: '0 4px 12px rgba(150,120,170,.08)' }}>
+                  <input
+                    autoFocus
+                    value={addText}
+                    onChange={(e) => setAddText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(g.owner); if (e.key === 'Escape') { setAddingOwner(null); setAddText(''); setAddEst(''); } }}
+                    placeholder={`${mt.who}의 새 할 일`}
+                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: '#514B5E', background: 'transparent' }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                    <span style={{ fontSize: 12, color: '#8a7f98' }}>⏱ 예상</span>
+                    <input
+                      type="number" min="1" inputMode="numeric"
+                      value={addEst}
+                      onChange={(e) => setAddEst(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(g.owner); }}
+                      placeholder="–"
+                      style={{ width: 46, border: '1.5px solid #F0E7DF', borderRadius: 10, padding: '4px 6px', fontSize: 13, color: '#514B5E', outline: 'none', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: 12, color: '#8a7f98' }}>분</span>
+                    <button onClick={() => { setAddingOwner(null); setAddText(''); setAddEst(''); }} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#B7AEC4', fontSize: 16, cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                    <button onClick={() => submitAdd(g.owner)} style={{ background: mt.ring, border: 'none', color: '#fff', fontSize: 13, padding: '7px 14px', borderRadius: 14, cursor: 'pointer' }}>추가</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setAddingOwner(g.owner); setAddText(''); }}
+                  style={{ display: 'block', width: 'calc(100% - 12px)', boxSizing: 'border-box', margin: 6, padding: '11px', borderRadius: 16, border: `2px dashed ${mt.ring}`, background: 'transparent', color: mt.ink, fontSize: 13, cursor: 'pointer' }}>
+                  ＋ 할 일 추가
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatsScreen({ todos, nowMs, fullDateLabel }) {
+  const groupOrder = ['mina', 'minseong', 'both'];
+  const groups = groupOrder
+    .map(o => ({ owner: o, items: todos.filter(t => t.owner === o) }))
+    .filter(g => g.items.length > 0);
+
+  const personMsg = (p) =>
+    p === 100 ? '다 끝냈어! 🏆' : p >= 50 ? '절반 넘었어 💪' : p > 0 ? '하나씩 해나가는 중 🌱' : '오늘도 천천히 시작해보자 🌱';
+
+  // 예상 vs 실제: 예상시간이 있고 실제 기록이 시작된 항목
+  const timed = todos
+    .filter(t => t.estMin && liveSec(t, nowMs) > 0)
+    .map(t => ({ t, est: t.estMin * 60, act: liveSec(t, nowMs) }));
+  const totalEst = timed.reduce((s, x) => s + x.est, 0);
+  const totalAct = timed.reduce((s, x) => s + x.act, 0);
+  const overall = totalEst > 0 ? diffLabel(totalEst, totalAct) : null;
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', margin: '14px 0 18px' }}>
+        <div style={{ fontSize: 13, color: '#A79FB4' }}>{fullDateLabel}</div>
+        <div style={{ fontFamily: "'Jua'", fontSize: 26, color: '#514B5E', marginTop: 2 }}>통계 📊</div>
+      </div>
+
+      {/* 사람별 진행상황 */}
+      {groups.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#B7AEC4', fontSize: 14, marginTop: 30 }}>오늘 할 일이 아직 없어 🌱</div>
+      )}
+      {groups.map(g => {
+        const mt = meta(g.owner);
+        const d = g.items.filter(t => t.done).length;
+        const tot = g.items.length;
+        const p = tot ? Math.round((d / tot) * 100) : 0;
+        const deg = Math.round((p / 100) * 360);
+        const ring = `conic-gradient(${mt.ring} ${deg}deg, #F1ECF4 ${deg}deg)`;
+        return (
+          <div key={g.owner} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 22, padding: '16px 18px', marginBottom: 14, boxShadow: '0 6px 18px rgba(150,120,170,.09)' }}>
+            <div style={{ width: 88, height: 88, borderRadius: '50%', background: ring, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
+              <div style={{ width: 66, height: 66, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Jua'", fontSize: 22, color: mt.ink }}>{p}%</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ background: mt.bg, width: 30, height: 30, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
+                  <img src={mt.avatar} style={{ width: 22, height: 22 }} />
+                </span>
+                <span style={{ fontFamily: "'Jua'", fontSize: 17, color: mt.ink }}>{mt.who}</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#7d738c', marginTop: 6 }}>{d} / {tot} 완료</div>
+              <div style={{ fontSize: 12, color: '#A79FB4', marginTop: 2 }}>{personMsg(p)}</div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* 예상 vs 실제 시간 */}
+      <div style={{ fontFamily: "'Jua'", fontSize: 16, color: '#514B5E', margin: '22px 2px 12px' }}>⏱ 예상 vs 실제</div>
+      {timed.length === 0 ? (
+        <div style={{ background: '#fff', borderRadius: 20, padding: '18px', textAlign: 'center', fontSize: 13, color: '#A79FB4', boxShadow: '0 6px 18px rgba(150,120,170,.08)' }}>
+          아직 시간 기록이 없어.<br />오늘 탭에서 <b style={{ color: '#3E9E63' }}>▶ 시작</b>을 눌러 재보자 🌱
+        </div>
+      ) : (
+        <div>
+          {overall && (
+            <div style={{ background: 'linear-gradient(105deg,#FFF0D9,#FFE7EE)', borderRadius: 18, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, color: '#8a7a5f' }}>예상 <b>{fmtMin(totalEst)}</b> · 실제 <b>{fmtMin(totalAct)}</b></div>
+              <div style={{ fontFamily: "'Jua'", fontSize: 14, color: overall.color }}>{overall.text}</div>
+            </div>
+          )}
+          {timed.map(({ t, est, act }) => {
+            const maxV = Math.max(est, act, 1);
+            return (
+              <div key={t.id} style={{ background: '#fff', borderRadius: 18, padding: '13px 15px', marginBottom: 10, boxShadow: '0 4px 12px rgba(150,120,170,.08)' }}>
+                <div style={{ fontSize: 14, color: '#514B5E', marginBottom: 9 }}>{t.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 34, fontSize: 11, color: '#6E7A9B' }}>예상</span>
+                  <div style={{ flex: 1, height: 12, background: '#F1ECF4', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ width: (est / maxV * 100) + '%', height: '100%', background: '#B9C2DE', borderRadius: 8 }}></div>
+                  </div>
+                  <span style={{ width: 42, textAlign: 'right', fontSize: 11, color: '#6E7A9B' }}>{fmtMin(est)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 34, fontSize: 11, color: '#E85D8A' }}>실제</span>
+                  <div style={{ flex: 1, height: 12, background: '#F1ECF4', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ width: (act / maxV * 100) + '%', height: '100%', background: 'linear-gradient(90deg,#FFC48F,#FF9EBB)', borderRadius: 8 }}></div>
+                  </div>
+                  <span style={{ width: 42, textAlign: 'right', fontSize: 11, color: '#E85D8A' }}>{fmtMin(act)}</span>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: 11, fontWeight: 'bold', marginTop: 6, color: diffLabel(est, act).color }}>{diffLabel(est, act).text}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 축하 오버레이 ---------- */
+function Celebration({ data }) {
+  if (!data) return null;
+  const confetti = Array.from({ length: 18 }, (_, i) => ({
+    emoji: CONF_EMOJI[i % CONF_EMOJI.length],
+    style: {
+      position: 'absolute', top: -30, left: Math.round(Math.random() * 100) + '%',
+      fontSize: (16 + Math.round(Math.random() * 12)) + 'px',
+      animation: `conf-fall ${1.2 + Math.random() * 0.9}s ease-in ${Math.random() * 0.4}s forwards`,
+    },
+  }));
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+        {confetti.map((c, i) => <span key={i} style={c.style}>{c.emoji}</span>)}
+      </div>
+      <div style={{ background: '#fff', borderRadius: 28, padding: '26px 30px', textAlign: 'center', boxShadow: '0 16px 40px rgba(200,110,150,.3)', animation: 'pop-in .45s ease', maxWidth: 250 }}>
+        <img src={data.avatar} style={{ width: 66, height: 66, animation: 'wiggle .5s ease infinite' }} />
+        <div style={{ fontFamily: "'Jua'", fontSize: 22, color: '#E85D8A', marginTop: 8 }}>{data.msg}</div>
+        <div style={{ fontSize: 14, color: '#9B93A7', marginTop: 4 }}>{data.sub}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 커플 코드 입력(페어링) 화면 ---------- */
+function PairingScreen({ onSubmit }) {
+  const [code, setCode] = useState('');
+  return (
+    <div className="phone" style={{ justifyContent: 'center', padding: '0 26px', gap: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 14 }}>
+          <img src={AV.minseong} style={{ width: 56, height: 56, animation: 'float-y 3s ease-in-out infinite' }} />
+          <img src={AV.mina} style={{ width: 56, height: 56, marginLeft: -10, animation: 'float-y 3s ease-in-out .6s infinite' }} />
+        </div>
+        <div style={{ fontFamily: "'Jua'", fontSize: 34, color: '#514B5E' }}>52<span style={{ color: '#E38BD0' }}>:</span>48</div>
+        <div style={{ fontSize: 13, color: '#A79FB4', margin: '8px 0 26px', lineHeight: 1.5 }}>
+          둘이 같은 <b style={{ color: '#E85D8A' }}>커플 코드</b>를 입력하면<br />할 일이 실시간으로 이어져요 💗
+        </div>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
+          onKeyDown={(e) => { if (e.key === 'Enter' && code.trim()) onSubmit(code.trim()); }}
+          placeholder="예: minseong-mina"
+          style={{ width: '100%', border: '2px solid #F0E7DF', background: '#fff', borderRadius: 18, padding: '14px 16px', fontSize: 16, color: '#514B5E', outline: 'none', textAlign: 'center' }}
+        />
+        <button
+          onClick={() => code.trim() && onSubmit(code.trim())}
+          style={{ width: '100%', marginTop: 14, background: '#FF9EBB', border: 'none', color: '#fff', fontFamily: "'Jua'", fontSize: 18, padding: 16, borderRadius: 20, cursor: 'pointer', boxShadow: '0 10px 22px rgba(255,158,187,.4)' }}>
+          시작하기 💕
+        </button>
+        <div style={{ fontSize: 11, color: '#B7AEC4', marginTop: 16 }}>
+          {isFirebaseConfigured ? '실시간 동기화 모드' : '로컬 모드 (이 기기에만 저장 · Firebase 설정 시 동기화)'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ *  앱 루트
+ * ============================================================ */
+function App() {
+  const [coupleId, setCoupleId] = useState(() => localStorage.getItem('couple52_48:id') || '');
+  const [tab, setTab] = useState('home');
+  const [todos, setTodos] = useState([]);
+  const [celebrate, setCelebrate] = useState(null);
+  const [ready, setReady] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
+  const storeRef = useRef(null);
+  const celebrateTimer = useRef(null);
+
+  // 실행 중인 타이머 라이브 갱신 (1초마다)
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // 커플 코드가 정해지면 데이터 스토어 연결
+  useEffect(() => {
+    if (!coupleId) return;
+    let unsub = () => {};
+    let cancelled = false;
+    (async () => {
+      let store;
+      if (isFirebaseConfigured && db) {
+        try { await auth.signInAnonymously(); } catch (e) { console.error('익명 로그인 실패:', e); }
+        store = makeFirestore(coupleId);
+        try { await store.ensureSeed(); } catch (e) { console.error('초기 데이터 생성 실패:', e); }
+      } else {
+        store = makeLocalStore(coupleId);
+      }
+      if (cancelled) return;
+      storeRef.current = store;
+      unsub = store.subscribe((list) => { setTodos(list); setReady(true); });
+    })();
+    return () => { cancelled = true; try { unsub(); } catch {} };
+  }, [coupleId]);
+
+  const fireCelebrate = useCallback((t) => {
+    const mt = meta(t.owner);
+    const i = Math.floor(Math.random() * CELEBRATE_MSGS.length);
+    setCelebrate({ avatar: mt.avatar, msg: CELEBRATE_MSGS[i], sub: `${mt.who}, ${CELEBRATE_SUBS[i]}` });
+    clearTimeout(celebrateTimer.current);
+    celebrateTimer.current = setTimeout(() => setCelebrate(null), 1900);
+  }, []);
+
+  const onToggle = useCallback((t) => {
+    const next = !t.done;
+    storeRef.current && storeRef.current.update(t.id, { done: next, completedAt: next ? Date.now() : null });
+    if (next) fireCelebrate(t);
+  }, [fireCelebrate]);
+
+  const onLike = useCallback((t) => {
+    const reactions = (t.reactions || []).includes('💖') ? t.reactions : [ ...(t.reactions || []), '💖' ];
+    storeRef.current && storeRef.current.update(t.id, { reactions });
+  }, []);
+
+  const onHelp = useCallback((t) => {
+    storeRef.current && storeRef.current.update(t.id, { needHelp: !t.needHelp });
+  }, []);
+
+  const onAdd = useCallback((partial) => {
+    storeRef.current && storeRef.current.add({ done: false, streak: 0, needHelp: false, reactions: [], estMin: null, actualSec: 0, timerStart: null, ...partial });
+  }, []);
+
+  const onStartTimer = useCallback((t) => {
+    storeRef.current && storeRef.current.update(t.id, { timerStart: Date.now() });
+  }, []);
+  const onStopTimer = useCallback((t) => {
+    const add = t.timerStart ? Math.max(0, (Date.now() - t.timerStart) / 1000) : 0;
+    storeRef.current && storeRef.current.update(t.id, { actualSec: (t.actualSec || 0) + add, timerStart: null });
+  }, []);
+
+  const onEdit = useCallback((t, patch) => {
+    storeRef.current && storeRef.current.update(t.id, patch);
+  }, []);
+  const onDelete = useCallback((t) => {
+    storeRef.current && storeRef.current.remove(t.id);
+  }, []);
+
+  const handlePair = (code) => {
+    localStorage.setItem('couple52_48:id', code);
+    setCoupleId(code);
+  };
+
+  // 날짜 / 미완료 자동 이월
+  const now = new Date();
+  const isToday = (ts) => {
+    if (!ts) return false;
+    const d = new Date(ts);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  };
+  // 오늘 보이는 목록: 미완료는 날짜와 무관하게 계속(=이월), 완료는 오늘 완료한 것만.
+  const visibleTodos = todos.filter(t => !t.done || isToday(t.completedAt));
+
+  const dow = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+  const dateLabel = `오늘 ${now.getMonth() + 1}월 ${now.getDate()}일 ${dow}`;
+  const fullDateLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${dow}요일`;
+
+  if (!coupleId) return <PairingScreen onSubmit={handlePair} />;
+
+  const tabs = [
+    { key: 'home', icon: '📋', label: '오늘' },
+    { key: 'stats', icon: '📊', label: '통계' },
+  ];
+
+  return (
+    <div className="phone">
+      <Celebration data={celebrate} />
+
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px 20px' }}>
+        {!ready && <div style={{ textAlign: 'center', color: '#B7AEC4', marginTop: 40 }}>불러오는 중… 💗</div>}
+        {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />}
+        {ready && tab === 'stats' && <StatsScreen todos={visibleTodos} nowMs={nowMs} fullDateLabel={fullDateLabel} />}
+      </div>
+
+      {/* 하단 네비 */}
+      <div style={{ flex: '0 0 auto', background: '#fff', borderTop: '1px solid #F1EAF3', display: 'flex', padding: '8px 8px 22px' }}>
+        {tabs.map(d => {
+          const active = tab === d.key;
+          return (
+            <button key={d.key} onClick={() => setTab(d.key)} style={{ flex: 1, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0' }}>
+              <span style={{ fontSize: 22, filter: active ? 'none' : 'grayscale(.4) opacity(.55)' }}>{d.icon}</span>
+              <span style={{ fontFamily: "'Jua'", fontSize: 11, color: active ? '#FF9EBB' : '#B7AEC4' }}>{d.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+<!-- classic JSX 런타임(React.createElement)으로 명시 변환 후 실행 -->
+<script>
+(function () {
+  var src = document.getElementById('app-src').textContent;
+  try {
+    var out = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
+    (0, eval)(out);
+  } catch (e) {
+    document.getElementById('root').innerHTML =
+      '<div style="padding:24px;font-family:sans-serif;color:#c0392b">앱 로드 오류: ' + e.message + '</div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
