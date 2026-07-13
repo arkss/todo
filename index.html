@@ -81,6 +81,8 @@ const { useState, useEffect, useRef, useCallback } = React;
 
 // 이 커플 코드만 입장 허용
 const ALLOWED_CODE = '0403';
+// 배포 버전 (배포 후 화면에서 이 값이 바뀌었는지로 최신본인지 확인)
+const APP_VERSION = 'v6';
 
 /* ---------- 아바타 (오리지널 SVG, data URI) ---------- */
 const uri = (s) => 'data:image/svg+xml,' + encodeURIComponent(s);
@@ -490,6 +492,90 @@ function StatsScreen({ todos, nowMs, fullDateLabel }) {
   );
 }
 
+/* ---------- 캘린더 (완료한 날 기준) ---------- */
+function CalendarScreen({ todos, nowMs, onToggle, onLike, onHelp, onEdit, onDelete, onStartTimer, onStopTimer }) {
+  const today = new Date();
+  const [ym, setYm] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [sel, setSel] = useState({ y: today.getFullYear(), m: today.getMonth(), d: today.getDate() });
+
+  const keyOf = (y, m, d) => y + '-' + m + '-' + d;
+  const byDay = {};
+  todos.forEach(t => {
+    if (t.done && t.completedAt) {
+      const dt = new Date(t.completedAt);
+      const k = keyOf(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      (byDay[k] || (byDay[k] = [])).push(t);
+    }
+  });
+
+  const prevM = () => setYm(s => s.m === 0 ? { y: s.y - 1, m: 11 } : { y: s.y, m: s.m - 1 });
+  const nextM = () => setYm(s => s.m === 11 ? { y: s.y + 1, m: 0 } : { y: s.y, m: s.m + 1 });
+
+  const firstDow = new Date(ym.y, ym.m, 1).getDay();
+  const daysInMonth = new Date(ym.y, ym.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const isToday = (d) => today.getFullYear() === ym.y && today.getMonth() === ym.m && today.getDate() === d;
+  const isSel = (d) => sel.y === ym.y && sel.m === ym.m && sel.d === d;
+  const selItems = byDay[keyOf(sel.y, sel.m, sel.d)] || [];
+  const dows = ['일', '월', '화', '수', '목', '금', '토'];
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', margin: '14px 0 16px' }}>
+        <div style={{ fontFamily: "'Jua'", fontSize: 26, color: '#514B5E' }}>캘린더 📆</div>
+      </div>
+
+      {/* 월 네비 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 4px 12px' }}>
+        <button onClick={prevM} style={{ background: '#F1ECF4', border: 'none', borderRadius: 12, width: 34, height: 34, fontSize: 16, color: '#7d738c', cursor: 'pointer' }}>‹</button>
+        <div style={{ fontFamily: "'Jua'", fontSize: 18, color: '#514B5E' }}>{ym.y}년 {ym.m + 1}월</div>
+        <button onClick={nextM} style={{ background: '#F1ECF4', border: 'none', borderRadius: 12, width: 34, height: 34, fontSize: 16, color: '#7d738c', cursor: 'pointer' }}>›</button>
+      </div>
+
+      {/* 요일 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
+        {dows.map((w, i) => (
+          <div key={w} style={{ textAlign: 'center', fontSize: 11, color: i === 0 ? '#E88AA6' : i === 6 ? '#8AA6D8' : '#A79FB4' }}>{w}</div>
+        ))}
+      </div>
+
+      {/* 날짜 그리드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 18 }}>
+        {cells.map((d, i) => {
+          if (d === null) return <div key={'e' + i}></div>;
+          const cnt = (byDay[keyOf(ym.y, ym.m, d)] || []).length;
+          const selected = isSel(d);
+          return (
+            <button key={d} onClick={() => setSel({ y: ym.y, m: ym.m, d })}
+              style={{ position: 'relative', height: 42, borderRadius: 12, cursor: 'pointer', fontSize: 14, fontFamily: "'Gowun Dodum'",
+                background: selected ? '#FF9EBB' : (cnt > 0 ? '#FFF0F4' : 'transparent'),
+                color: selected ? '#fff' : '#514B5E',
+                border: isToday(d) && !selected ? '2px solid #FFC9D8' : '2px solid transparent' }}>
+              {d}
+              {cnt > 0 && <span style={{ position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: selected ? '#fff' : '#FF9EBB' }}></span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 선택한 날의 완료 목록 */}
+      <div style={{ fontFamily: "'Jua'", fontSize: 15, color: '#514B5E', margin: '0 2px 10px' }}>
+        {ym.m + 1}월 {sel.d}일 · 완료한 일 {selItems.length}개
+      </div>
+      {selItems.length === 0 ? (
+        <div style={{ background: '#fff', borderRadius: 18, padding: '18px', textAlign: 'center', fontSize: 13, color: '#A79FB4', boxShadow: '0 4px 12px rgba(150,120,170,.08)' }}>이 날 완료한 일이 없어 🌱</div>
+      ) : (
+        selItems.map(t => (
+          <TodoCard key={t.id} t={t} nowMs={nowMs} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />
+        ))
+      )}
+    </div>
+  );
+}
+
 /* ---------- 축하 오버레이 ---------- */
 function Celebration({ data }) {
   if (!data) return null;
@@ -662,17 +748,20 @@ function App() {
 
   const tabs = [
     { key: 'home', icon: '📋', label: '오늘' },
+    { key: 'calendar', icon: '📆', label: '캘린더' },
     { key: 'stats', icon: '📊', label: '통계' },
   ];
 
   return (
     <div className="phone">
+      <div style={{ position: 'absolute', bottom: 2, left: 8, fontSize: 9, color: '#D9D2E0', zIndex: 5, pointerEvents: 'none' }}>{APP_VERSION}</div>
       <Celebration data={celebrate} />
 
       <div style={{ flex: '1 1 auto', overflowY: 'auto', paddingTop: 'calc(16px + env(safe-area-inset-top))', paddingLeft: 18, paddingRight: 18, paddingBottom: 20 }}>
         {!ready && <div style={{ textAlign: 'center', color: '#B7AEC4', marginTop: 40 }}>불러오는 중… 💗</div>}
         {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />}
         {ready && tab === 'stats' && <StatsScreen todos={visibleTodos} nowMs={nowMs} fullDateLabel={fullDateLabel} />}
+        {ready && tab === 'calendar' && <CalendarScreen todos={todos} nowMs={nowMs} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onEdit={onEdit} onDelete={onDelete} onStartTimer={onStartTimer} onStopTimer={onStopTimer} />}
       </div>
 
       {/* 하단 네비 */}
