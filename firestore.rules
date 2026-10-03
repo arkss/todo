@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// 52:48 커플 TODO — Firestore 보안 규칙
+// 로그인(익명 인증)한 사용자만 읽기/쓰기 가능. 커플 코드(coupleId)를
+// 아는 두 사람이 같은 방을 공유하는 구조입니다.
+//
+// ⚠️  커플 코드가 곧 접근 열쇠입니다. 추측하기 어려운 값
+//     (예: "minseong-mina-2026-a7x9")을 쓰세요.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /couples/{coupleId}/todos/{todoId} {
+      allow read, write: if request.auth != null;
+    }
+    match /couples/{coupleId}/tokens/{tokenId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
