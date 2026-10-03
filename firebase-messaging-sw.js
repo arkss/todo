@@ -25,9 +25,14 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// 알림 탭하면 앱 열기
+// 알림 탭하면 앱 열기 (설치 경로로 — 루트 404 방지)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
-  event.waitUntil(clients.openWindow(url));
+  const target = self.registration.scope; // 예: https://arkss.github.io/todo/
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) { if (w.url.startsWith(target) && 'focus' in w) return w.focus(); }
+      return clients.openWindow(target);
+    })
+  );
 });

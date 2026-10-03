@@ -31,7 +31,7 @@ async function main() {
     const tokens = entries.map((e) => e.token);
     const res = await admin.messaging().sendEachForMulticast({
       tokens,
-      data: { title, body, url: '/' },
+      data: { title, body, url: 'https://arkss.github.io/todo/' },
     });
     console.log(`[${coupleId}] 발송 ${res.successCount}/${tokens.length}`);
 
