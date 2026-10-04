@@ -83,7 +83,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 // 이 커플 코드만 입장 허용
 const ALLOWED_CODE = '0403';
 // 배포 버전 (배포 후 화면에서 이 값이 바뀌었는지로 최신본인지 확인)
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 // 웹 푸시(FCM) VAPID 키 — Firebase 콘솔 > Cloud Messaging > 웹 푸시 인증서에서 생성해 붙여넣기
 const VAPID_KEY = "BJ1GeLGjXZ7jqQjy2ZktG2o4zbdraOZKKfRlW0EFsUtwXV1A4GDuusWqG-q2g_7GDu6zsXrKcaDayThg2rWJmiU";
 
@@ -293,7 +293,7 @@ function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer,
 /* ============================================================
  *  화면들
  * ============================================================ */
-function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHelp, onAdd, onStartTimer, onStopTimer, onEdit, onDelete, notif, notifSupported, onEnableNotif }) {
+function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHelp, onAdd, onStartTimer, onStopTimer, onEdit, onDelete, notif, notifSupported, onEnableNotif, hideDone, onToggleHideDone }) {
   const groupOrder = ['mina', 'minseong', 'both'];
   // 사람별 그룹은 항상 표시(비어 있어도) → 어느 사람이든 그 자리에서 추가 가능
   const groups = groupOrder.map(o => ({ owner: o, items: todos.filter(t => t.owner === o) }));
@@ -347,10 +347,20 @@ function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHel
         </div>
       )}
 
+      {/* 완료 숨기기 토글 */}
+      {(hideDone || todos.some(t => isDoneOn(t, todayKey))) && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 2px 10px' }}>
+          <button onClick={onToggleHideDone} style={{ background: hideDone ? '#F1ECF4' : '#fff', border: '1.5px solid #ECE4F0', borderRadius: 14, padding: '5px 11px', fontSize: 12, color: '#8a7f98', cursor: 'pointer' }}>
+            {hideDone ? '✓ 완료한 일 보기' : '완료한 일 숨기기'}
+          </button>
+        </div>
+      )}
+
       {/* 사람별 그룹 */}
       {groups.map((g) => {
         const mt = meta(g.owner);
         const doneN = g.items.filter(t => isDoneOn(t, todayKey)).length;
+        const displayItems = hideDone ? g.items.filter(t => !isDoneOn(t, todayKey)) : g.items;
         const adding = addingOwner === g.owner;
         return (
           <div key={g.owner} style={{ marginBottom: 18 }}>
@@ -366,7 +376,7 @@ function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHel
               </div>
             </div>
             <div style={{ background: mt.bg, borderRadius: 24, padding: 8 }}>
-              {g.items.map(t => (
+              {displayItems.map(t => (
                 <TodoCard key={t.id} t={t} nowMs={nowMs} refDayKey={todayKey} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} />
               ))}
 
@@ -682,6 +692,10 @@ function App() {
   const [ready, setReady] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   const [notif, setNotif] = useState('unsupported'); // 'unsupported' | 'default' | 'granted' | 'denied'
+  const [hideDone, setHideDone] = useState(() => localStorage.getItem('couple52_48:hideDone') === '1');
+  const toggleHideDone = useCallback(() => {
+    setHideDone(v => { const nv = !v; localStorage.setItem('couple52_48:hideDone', nv ? '1' : '0'); return nv; });
+  }, []);
   const storeRef = useRef(null);
   const celebrateTimer = useRef(null);
 
@@ -828,7 +842,7 @@ function App() {
 
       <div style={{ flex: '1 1 auto', overflowY: 'auto', paddingTop: 'calc(16px + env(safe-area-inset-top))', paddingLeft: 18, paddingRight: 18, paddingBottom: 20 }}>
         {!ready && <div style={{ textAlign: 'center', color: '#B7AEC4', marginTop: 40 }}>불러오는 중… 💗</div>}
-        {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} notif={notif} notifSupported={notifSupported} onEnableNotif={enableNotif} />}
+        {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} notif={notif} notifSupported={notifSupported} onEnableNotif={enableNotif} hideDone={hideDone} onToggleHideDone={toggleHideDone} />}
         {ready && tab === 'stats' && <StatsScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} fullDateLabel={fullDateLabel} />}
         {ready && tab === 'calendar' && <CalendarScreen todos={todos} nowMs={nowMs} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onEdit={onEdit} onDelete={onDelete} onStartTimer={onStartTimer} onStopTimer={onStopTimer} />}
       </div>
