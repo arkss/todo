@@ -83,7 +83,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 // 이 커플 코드만 입장 허용
 const ALLOWED_CODE = '0403';
 // 배포 버전 (배포 후 화면에서 이 값이 바뀌었는지로 최신본인지 확인)
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 // 웹 푸시(FCM) VAPID 키 — Firebase 콘솔 > Cloud Messaging > 웹 푸시 인증서에서 생성해 붙여넣기
 const VAPID_KEY = "BJ1GeLGjXZ7jqQjy2ZktG2o4zbdraOZKKfRlW0EFsUtwXV1A4GDuusWqG-q2g_7GDu6zsXrKcaDayThg2rWJmiU";
 
@@ -199,7 +199,7 @@ function titleStyle(done) {
 }
 
 /* ---------- 홈: 사람별 카드 안의 한 항목 ---------- */
-function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer, onStopTimer, onEdit, onDelete }) {
+function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer, onStopTimer, onEdit, onDelete, onMoveToday, showTimer = true }) {
   const key = refDayKey || dayKey(Date.now());
   const done = isDoneOn(t, key);               // 반복이면 그날 완료 여부, 일반이면 done
   const isRepeat = t.repeat === 'daily';
@@ -234,19 +234,21 @@ function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer,
           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false); }}
           style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: '#514B5E', background: 'transparent' }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
-          <span style={{ fontSize: 12, color: '#8a7f98' }}>⏱ 예상</span>
-          <input
-            type="number" min="1" inputMode="numeric" value={eEst}
-            onChange={(e) => setEEst(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
-            placeholder="–"
-            style={{ width: 46, border: '1.5px solid #F0E7DF', borderRadius: 10, padding: '4px 6px', fontSize: 13, color: '#514B5E', outline: 'none', textAlign: 'center' }}
-          />
-          <span style={{ fontSize: 12, color: '#8a7f98' }}>분</span>
-        </div>
+        {showTimer && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
+            <span style={{ fontSize: 12, color: '#8a7f98' }}>⏱ 예상</span>
+            <input
+              type="number" min="1" inputMode="numeric" value={eEst}
+              onChange={(e) => setEEst(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
+              placeholder="–"
+              style={{ width: 46, border: '1.5px solid #F0E7DF', borderRadius: 10, padding: '4px 6px', fontSize: 13, color: '#514B5E', outline: 'none', textAlign: 'center' }}
+            />
+            <span style={{ fontSize: 12, color: '#8a7f98' }}>분</span>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-          <button onClick={() => setERepeat(v => !v)} style={{ background: eRepeat ? mt.bg : '#fff', color: eRepeat ? mt.ink : '#9B93A7', border: `1.5px solid ${eRepeat ? mt.ring : '#F0E7DF'}`, borderRadius: 14, padding: '5px 11px', fontSize: 12, cursor: 'pointer' }}>🔁 매일 반복 {eRepeat ? 'ON' : 'OFF'}</button>
+          {showTimer && <button onClick={() => setERepeat(v => !v)} style={{ background: eRepeat ? mt.bg : '#fff', color: eRepeat ? mt.ink : '#9B93A7', border: `1.5px solid ${eRepeat ? mt.ring : '#F0E7DF'}`, borderRadius: 14, padding: '5px 11px', fontSize: 12, cursor: 'pointer' }}>🔁 매일 반복 {eRepeat ? 'ON' : 'OFF'}</button>}
           <button onClick={delEdit} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#D66', fontSize: 12, cursor: 'pointer', padding: '5px 6px' }}>🗑 삭제</button>
           <button onClick={() => setEditing(false)} style={{ background: 'none', border: 'none', color: '#B7AEC4', fontSize: 12, cursor: 'pointer', padding: '5px 6px' }}>취소</button>
           <button onClick={saveEdit} style={{ background: mt.ring, border: 'none', color: '#fff', fontSize: 13, padding: '7px 14px', borderRadius: 14, cursor: 'pointer' }}>저장</button>
@@ -262,28 +264,31 @@ function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer,
       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <CheckBox done={done} owner={t.owner} onClick={() => onToggle(t, key)} />
         <span style={{ ...titleStyle(done), flex: 1 }}>{t.title}</span>
-        {isRepeat && <span title="매일 반복" style={{ fontSize: 12, color: mt.ink }}>🔁</span>}
+        {showTimer && isRepeat && <span title="매일 반복" style={{ fontSize: 12, color: mt.ink }}>🔁</span>}
         {t.streak > 0 && <span style={{ fontSize: 12, color: '#E0912B' }}>🔥{t.streak}</span>}
         <button onClick={startEdit} title="수정" style={{ background: 'none', border: 'none', color: '#C9C1D4', fontSize: 13, cursor: 'pointer', padding: '2px 4px', flex: '0 0 auto' }}>✏️</button>
       </div>
 
       {/* 시간: 예상 · 실제 · 비교 + 타이머 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
-        {t.estMin ? <span style={{ background: '#EEF0F6', color: '#6E7A9B', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>⏱ 예상 {t.estMin}분</span> : null}
-        {hasActual ? <span style={{ background: running ? '#FFE7EE' : '#F1ECF4', color: running ? '#E85D8A' : '#7d738c', fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 20 }}>{running ? '▶ ' : '실제 '}{fmtClock(cur)}</span> : null}
-        {diff ? <span style={{ color: diff.color, fontSize: 11, fontWeight: 'bold' }}>{diff.text}</span> : null}
-        {!done && (
-          running
-            ? <button onClick={() => onStopTimer(t)} style={{ marginLeft: 'auto', background: '#FFE1E7', border: 'none', color: '#E85D8A', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>⏹ 끝</button>
-            : <button onClick={() => onStartTimer(t)} style={{ marginLeft: 'auto', background: '#E9F6EE', border: 'none', color: '#3E9E63', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>{hasActual ? '▶ 이어서' : '▶ 시작'}</button>
-        )}
-      </div>
+      {showTimer && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+          {t.estMin ? <span style={{ background: '#EEF0F6', color: '#6E7A9B', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>⏱ 예상 {t.estMin}분</span> : null}
+          {hasActual ? <span style={{ background: running ? '#FFE7EE' : '#F1ECF4', color: running ? '#E85D8A' : '#7d738c', fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 20 }}>{running ? '▶ ' : '실제 '}{fmtClock(cur)}</span> : null}
+          {diff ? <span style={{ color: diff.color, fontSize: 11, fontWeight: 'bold' }}>{diff.text}</span> : null}
+          {!done && (
+            running
+              ? <button onClick={() => onStopTimer(t)} style={{ marginLeft: 'auto', background: '#FFE1E7', border: 'none', color: '#E85D8A', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>⏹ 끝</button>
+              : <button onClick={() => onStartTimer(t)} style={{ marginLeft: 'auto', background: '#E9F6EE', border: 'none', color: '#3E9E63', fontSize: 11, fontWeight: 'bold', padding: '5px 11px', borderRadius: 14, cursor: 'pointer' }}>{hasActual ? '▶ 이어서' : '▶ 시작'}</button>
+          )}
+        </div>
+      )}
 
-      {/* 응원 / 도움요청 */}
+      {/* 응원 / 도움요청 / 오늘로 가져오기 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
         {t.needHelp && <span style={{ background: '#FFE1E7', color: '#E85D8A', fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 20 }}>🆘 도와줘!</span>}
         {(t.reactions || []).map((r, i) => <span key={i} style={{ fontSize: 14 }}>{r}</span>)}
-        <button onClick={() => onLike(t)} style={{ marginLeft: 'auto', background: '#FFF0F4', border: 'none', color: '#E85D8A', fontSize: 11, padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>💖</button>
+        {onMoveToday && !done && <button onClick={() => onMoveToday(t)} style={{ marginLeft: 'auto', background: '#FFF3E0', border: 'none', color: '#E0912B', fontSize: 11, fontWeight: 'bold', padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>☀️ 오늘로 가져오기</button>}
+        <button onClick={() => onLike(t)} style={{ marginLeft: onMoveToday && !done ? 0 : 'auto', background: '#FFF0F4', border: 'none', color: '#E85D8A', fontSize: 11, padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>💖</button>
         {canHelp && <button onClick={() => onHelp(t)} style={{ background: '#EAF4FB', border: 'none', color: '#3D8FC0', fontSize: 11, padding: '5px 10px', borderRadius: 14, cursor: 'pointer' }}>🙋</button>}
       </div>
     </div>
@@ -293,11 +298,16 @@ function TodoCard({ t, nowMs, refDayKey, onToggle, onLike, onHelp, onStartTimer,
 /* ============================================================
  *  화면들
  * ============================================================ */
-function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHelp, onAdd, onStartTimer, onStopTimer, onEdit, onDelete, notif, notifSupported, onEnableNotif, hideDone, onToggleHideDone }) {
+function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHelp, onAdd, onStartTimer, onStopTimer, onEdit, onDelete, onMoveToday, notif, notifSupported, onEnableNotif, hideDone, onToggleHideDone }) {
   const groupOrder = ['mina', 'minseong', 'both'];
+  const isLongterm = (t) => t.bucket === 'longterm';
+  const todayTodos = todos.filter(t => !isLongterm(t));
+  const ltTodos = todos.filter(isLongterm);
+
   // 사람별 그룹은 항상 표시(비어 있어도) → 어느 사람이든 그 자리에서 추가 가능
-  const groups = groupOrder.map(o => ({ owner: o, items: todos.filter(t => t.owner === o) }));
-  const firstMinaUndone = todos.find(t => t.owner === 'mina' && !isDoneOn(t, todayKey));
+  const groups = groupOrder.map(o => ({ owner: o, items: todayTodos.filter(t => t.owner === o) }));
+  const ltGroups = groupOrder.map(o => ({ owner: o, items: ltTodos.filter(t => t.owner === o) }));
+  const firstMinaUndone = todayTodos.find(t => t.owner === 'mina' && !isDoneOn(t, todayKey));
 
   const [addingOwner, setAddingOwner] = useState(null);
   const [addText, setAddText] = useState('');
@@ -305,8 +315,24 @@ function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHel
   const [addRepeat, setAddRepeat] = useState(false);
   const submitAdd = (owner) => {
     const est = parseInt(addEst, 10);
-    onAdd({ title: (addText || '').trim() || '새로운 할 일', owner, estMin: est > 0 ? est : null, repeat: addRepeat ? 'daily' : null });
+    onAdd({ title: (addText || '').trim() || '새로운 할 일', owner, bucket: 'today', estMin: est > 0 ? est : null, repeat: addRepeat ? 'daily' : null });
     setAddText(''); setAddEst(''); setAddRepeat(false); setAddingOwner(null);
+  };
+
+  // 장기 목표 섹션: 펼침 상태는 기기에 기억
+  const [ltOpen, setLtOpen] = useState(() => {
+    try { return localStorage.getItem('couple52_48:ltOpen') !== '0'; } catch { return true; }
+  });
+  const toggleLtOpen = () => setLtOpen((v) => {
+    const next = !v;
+    try { localStorage.setItem('couple52_48:ltOpen', next ? '1' : '0'); } catch {}
+    return next;
+  });
+  const [addingLtOwner, setAddingLtOwner] = useState(null);
+  const [addLtText, setAddLtText] = useState('');
+  const submitLtAdd = (owner) => {
+    onAdd({ title: (addLtText || '').trim() || '새로운 장기 목표', owner, bucket: 'longterm', estMin: null, repeat: null });
+    setAddLtText(''); setAddingLtOwner(null);
   };
 
   return (
@@ -340,15 +366,15 @@ function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHel
       {/* 넛지 배너 */}
       {firstMinaUndone && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'linear-gradient(105deg,#FFF0D9,#FFE7EE)', borderRadius: 20, padding: '12px 14px', marginBottom: 16, border: '1.5px dashed #FFC9A3' }}>
-          <span style={{ fontSize: 22 }}>💧</span>
+          <span style={{ fontSize: 22 }}>❤️</span>
           <div style={{ fontSize: 13, color: '#8a7a5f', lineHeight: 1.35 }}>
-            <b style={{ color: '#E58a4a' }}>미나야</b>, 물 한 잔 어때? <span style={{ color: '#B79A76' }}>(잔소리 아니고 응원이야 ✨)</span>
+            <b style={{ color: '#E58a4a' }}>미나</b>는 지금도 잘하고 있어 ❤️
           </div>
         </div>
       )}
 
       {/* 완료 숨기기 토글 */}
-      {(hideDone || todos.some(t => isDoneOn(t, todayKey))) && (
+      {(hideDone || todayTodos.some(t => isDoneOn(t, todayKey))) && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 2px 10px' }}>
           <button onClick={onToggleHideDone} style={{ background: hideDone ? '#F1ECF4' : '#fff', border: '1.5px solid #ECE4F0', borderRadius: 14, padding: '5px 11px', fontSize: 12, color: '#8a7f98', cursor: 'pointer' }}>
             {hideDone ? '✓ 완료한 일 보기' : '완료한 일 숨기기'}
@@ -420,6 +446,54 @@ function HomeScreen({ todos, nowMs, todayKey, dateLabel, onToggle, onLike, onHel
           </div>
         );
       })}
+
+      {/* 장기 목표 섹션 */}
+      <div style={{ marginTop: 6 }}>
+        <button
+          onClick={toggleLtOpen}
+          style={{ display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '10px 4px', gap: 8 }}>
+          <span style={{ fontFamily: "'Jua'", fontSize: 16, color: '#514B5E' }}>🎯 장기 목표 ({ltTodos.length})</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#B7AEC4', display: 'inline-block', transition: '.2s', transform: ltOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+        </button>
+
+        {ltOpen && ltGroups.map((g) => {
+          const mt = meta(g.owner);
+          const adding = addingLtOwner === g.owner;
+          return (
+            <div key={g.owner} style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: "'Jua'", fontSize: 13, color: mt.ink, margin: '0 6px 6px' }}>{mt.who}의 장기 목표</div>
+              <div style={{ background: mt.bg, borderRadius: 24, padding: 8 }}>
+                {g.items.map(t => (
+                  <TodoCard key={t.id} t={t} nowMs={nowMs} refDayKey={todayKey} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onEdit={onEdit} onDelete={onDelete} onMoveToday={onMoveToday} showTimer={false} />
+                ))}
+
+                {adding ? (
+                  <div style={{ background: '#fff', borderRadius: 18, padding: '10px 12px', margin: 6, boxShadow: '0 4px 12px rgba(150,120,170,.08)' }}>
+                    <input
+                      autoFocus
+                      value={addLtText}
+                      onChange={(e) => setAddLtText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') submitLtAdd(g.owner); if (e.key === 'Escape') { setAddingLtOwner(null); setAddLtText(''); } }}
+                      placeholder={`${mt.who}의 새 장기 목표`}
+                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: '#514B5E', background: 'transparent' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={() => { setAddingLtOwner(null); setAddLtText(''); }} style={{ background: 'none', border: 'none', color: '#B7AEC4', fontSize: 16, cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                      <button onClick={() => submitLtAdd(g.owner)} style={{ background: mt.ring, border: 'none', color: '#fff', fontSize: 13, padding: '7px 14px', borderRadius: 14, cursor: 'pointer' }}>추가</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setAddingLtOwner(g.owner); setAddLtText(''); }}
+                    style={{ display: 'block', width: 'calc(100% - 12px)', boxSizing: 'border-box', margin: 6, padding: '11px', borderRadius: 16, border: `2px dashed ${mt.ring}`, background: 'transparent', color: mt.ink, fontSize: 13, cursor: 'pointer' }}>
+                    ＋ 장기 목표 추가
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -801,6 +875,10 @@ function App() {
   const onDelete = useCallback((t) => {
     storeRef.current && storeRef.current.remove(t.id);
   }, []);
+  // 장기 목표 → 오늘로 이동 (복제 아님, bucket만 바꿔서 오늘 탭으로 옮김)
+  const onMoveToday = useCallback((t) => {
+    storeRef.current && storeRef.current.update(t.id, { bucket: 'today' });
+  }, []);
 
   const handlePair = (code) => {
     localStorage.setItem('couple52_48:id', code);
@@ -842,8 +920,8 @@ function App() {
 
       <div style={{ flex: '1 1 auto', overflowY: 'auto', paddingTop: 'calc(16px + env(safe-area-inset-top))', paddingLeft: 18, paddingRight: 18, paddingBottom: 20 }}>
         {!ready && <div style={{ textAlign: 'center', color: '#B7AEC4', marginTop: 40 }}>불러오는 중… 💗</div>}
-        {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} notif={notif} notifSupported={notifSupported} onEnableNotif={enableNotif} hideDone={hideDone} onToggleHideDone={toggleHideDone} />}
-        {ready && tab === 'stats' && <StatsScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} fullDateLabel={fullDateLabel} />}
+        {ready && tab === 'home' && <HomeScreen todos={visibleTodos} nowMs={nowMs} todayKey={todayKey} dateLabel={dateLabel} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onAdd={onAdd} onStartTimer={onStartTimer} onStopTimer={onStopTimer} onEdit={onEdit} onDelete={onDelete} onMoveToday={onMoveToday} notif={notif} notifSupported={notifSupported} onEnableNotif={enableNotif} hideDone={hideDone} onToggleHideDone={toggleHideDone} />}
+        {ready && tab === 'stats' && <StatsScreen todos={visibleTodos.filter(t => t.bucket !== 'longterm')} nowMs={nowMs} todayKey={todayKey} fullDateLabel={fullDateLabel} />}
         {ready && tab === 'calendar' && <CalendarScreen todos={todos} nowMs={nowMs} onToggle={onToggle} onLike={onLike} onHelp={onHelp} onEdit={onEdit} onDelete={onDelete} onStartTimer={onStartTimer} onStopTimer={onStopTimer} />}
       </div>
 
